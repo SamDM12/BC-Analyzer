@@ -1,9 +1,9 @@
 import express from 'express';
 import cors from 'cors';
 import dotenv from 'dotenv';
-import mongoose from 'mongoose';
+import connectDB from './config/database.js';
+import dataRoutes from './routes/dataRoutes.js';  // ← NUEVO
 
-// Cargar variables de entorno
 dotenv.config();
 
 const app = express();
@@ -19,26 +19,26 @@ app.get('/', (req, res) => {
   res.json({ 
     message: 'BC Analyzer API',
     version: '1.0.0',
-    status: 'running'
+    status: 'running',
+    endpoints: {
+      data: '/api/data',
+      upload: '/api/data/upload',
+      stats: '/api/data/stats'
+    }
   });
 });
 
-// Conexión a MongoDB
-mongoose.connect(process.env.MONGODB_URI)
-  .then(() => {
-    console.log('Conectado a MongoDB');
-    
-    // Iniciar servidor solo si la DB está conectada
-    app.listen(PORT, () => {
-      console.log(`Servidor corriendo en http://localhost:${PORT}`);
-    });
-  })
-  .catch((error) => {
-    console.error('Error conectando a MongoDB:', error.message);
-    process.exit(1);
-  });
+// Rutas de la API  ← NUEVO
+app.use('/api/data', dataRoutes);
 
-// Manejo de errores no capturados
+// Conectar a la base de datos e iniciar servidor
+connectDB().then(() => {
+  app.listen(PORT, () => {
+    console.log(`Servidor corriendo en http://localhost:${PORT}`);
+    console.log(`Modo: ${process.env.NODE_ENV}`);
+  });
+});
+
 process.on('unhandledRejection', (error) => {
   console.error('Error no manejado:', error);
   process.exit(1);
