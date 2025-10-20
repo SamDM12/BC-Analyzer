@@ -87,21 +87,56 @@ class DataController {
   // Obtener datos con filtros
   async getData(req, res) {
     try {
-      const { age, job, education, month, loan, page = 1, limit = 50 } = req.query;
+      const { 
+        // Filtros básicos
+        age, job, education, month, loan, marital, housing, contact, poutcome, y,
+        // Filtros de rango
+        ageMin, ageMax, durationMin, durationMax,
+        // Paginación
+        page = 1, limit = 50,
+        // Ordenamiento
+        sortBy = 'age', 
+        sortOrder = 'asc'
+      } = req.query;
       
       // Construir filtros dinámicos
       const filters = {};
+      
+      // Filtros simples
       if (age) filters.age = parseInt(age);
       if (job) filters.job = job;
       if (education) filters.education = education;
       if (month) filters.month = month;
       if (loan) filters.loan = loan;
+      if (marital) filters.marital = marital;
+      if (housing) filters.housing = housing;
+      if (contact) filters.contact = contact;
+      if (poutcome) filters.poutcome = poutcome;
+      if (y) filters.y = y;
+      
+      // Filtros de rango
+      if (ageMin || ageMax) {
+        filters.age = {};
+        if (ageMin) filters.age.$gte = parseInt(ageMin);
+        if (ageMax) filters.age.$lte = parseInt(ageMax);
+      }
+      
+      if (durationMin || durationMax) {
+        filters.duration = {};
+        if (durationMin) filters.duration.$gte = parseInt(durationMin);
+        if (durationMax) filters.duration.$lte = parseInt(durationMax);
+      }
+
+      // Construir ordenamiento
+      const sort = {};
+      sort[sortBy] = sortOrder === 'desc' ? -1 : 1;
 
       // Calcular paginación
       const skip = (parseInt(page) - 1) * parseInt(limit);
 
       // Obtener datos
       const data = await Cliente.find(filters)
+        .sort(sort)
         .limit(parseInt(limit))
         .skip(skip)
         .lean();
@@ -116,7 +151,9 @@ class DataController {
           total,
           pagina: parseInt(page),
           totalPaginas: Math.ceil(total / parseInt(limit)),
-          registrosPorPagina: parseInt(limit)
+          registrosPorPagina: parseInt(limit),
+          filtrosAplicados: filters,
+          ordenamiento: { campo: sortBy, orden: sortOrder }
         }
       });
 
@@ -125,6 +162,69 @@ class DataController {
       res.status(500).json({
         success: false,
         message: 'Error al obtener datos',
+        error: error.message
+      });
+    }
+  }
+
+  // NUEVO: Obtener opciones de filtros
+  async getFilterOptions(req, res) {
+    try {
+      const { field } = req.params;
+      
+      const validFields = ['job', 'education', 'marital', 'housing', 'loan', 'contact', 'month', 'poutcome', 'y'];
+      
+      if (!validFields.includes(field)) {
+        return res.status(400).json({
+          success: false,
+          message: 'Campo no válido para filtro'
+        });
+      }
+      
+      const values = await Cliente.distinct(field);
+      
+      res.status(200).json({
+        success: true,
+        data: {
+          field,
+          values: values.sort()
+        }
+      });
+      
+    } catch (error) {
+      console.error('Error en getFilterOptions:', error);
+      res.status(500).json({
+        success: false,
+        message: 'Error al obtener opciones de filtro',
+        error: error.message
+      });
+    }
+  }
+
+  // NUEVO: Obtener rangos para filtros numéricos
+  async getFilterRanges(req, res) {
+    try {
+      const ageRange = await Cliente.aggregate([
+        { $group: { _id: null, min: { $min: '$age' }, max: { $max: '$age' } } }
+      ]);
+
+      const durationRange = await Cliente.aggregate([
+        { $group: { _id: null, min: { $min: '$duration' }, max: { $max: '$duration' } } }
+      ]);
+
+      res.status(200).json({
+        success: true,
+        data: {
+          age: ageRange[0] || { min: 18, max: 100 },
+          duration: durationRange[0] || { min: 0, max: 5000 }
+        }
+      });
+
+    } catch (error) {
+      console.error('Error en getFilterRanges:', error);
+      res.status(500).json({
+        success: false,
+        message: 'Error al obtener rangos',
         error: error.message
       });
     }
