@@ -23,8 +23,7 @@ const clienteSchema = new mongoose.Schema({
   education: {
     type: String,
     required: true,
-    enum: ['basic.4y', 'basic.6y', 'basic.9y', 'high.school', 
-           'illiterate', 'professional.course', 'university.degree', 'unknown']
+    enum: ['primary', 'secondary', 'tertiary', 'unknown']
   },
   
   // Información financiera
@@ -32,6 +31,10 @@ const clienteSchema = new mongoose.Schema({
     type: String,
     required: true,
     enum: ['no', 'yes', 'unknown']
+  },
+  balance: {
+    type: Number,
+    required: true
   },
   housing: {
     type: String,
@@ -48,18 +51,19 @@ const clienteSchema = new mongoose.Schema({
   contact: {
     type: String,
     required: true,
-    enum: ['cellular', 'telephone']
+    enum: ['cellular', 'telephone', 'unknown']
+  },
+  day: {
+    type: Number,
+    required: true,
+    min: 1,
+    max: 31
   },
   month: {
     type: String,
     required: true,
     enum: ['jan', 'feb', 'mar', 'apr', 'may', 'jun', 
            'jul', 'aug', 'sep', 'oct', 'nov', 'dec']
-  },
-  day_of_week: {
-    type: String,
-    required: true,
-    enum: ['mon', 'tue', 'wed', 'thu', 'fri']
   },
   duration: {
     type: Number,
@@ -85,29 +89,7 @@ const clienteSchema = new mongoose.Schema({
   poutcome: {
     type: String,
     required: true,
-    enum: ['failure', 'nonexistent', 'success']
-  },
-  
-  // Indicadores económicos
-  emp_var_rate: {
-    type: Number,
-    required: true
-  },
-  cons_price_idx: {
-    type: Number,
-    required: true
-  },
-  cons_conf_idx: {
-    type: Number,
-    required: true
-  },
-  euribor3m: {
-    type: Number,
-    required: true
-  },
-  nr_employed: {
-    type: Number,
-    required: true
+    enum: ['failure', 'other', 'success', 'unknown']
   },
   
   // Resultado
@@ -126,6 +108,7 @@ clienteSchema.index({ job: 1 });
 clienteSchema.index({ education: 1 });
 clienteSchema.index({ month: 1 });
 clienteSchema.index({ y: 1 });
+clienteSchema.index({ balance: 1 });
 
 const Cliente = mongoose.model('Cliente', clienteSchema);
 

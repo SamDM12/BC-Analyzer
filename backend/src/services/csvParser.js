@@ -5,23 +5,35 @@ import XLSX from 'xlsx';
 class CSVParserService {
   
   // Parsear archivo CSV
+  // Parsear archivo CSV
   async parseCSV(filePath) {
     return new Promise((resolve, reject) => {
-      const fileContent = fs.readFileSync(filePath, 'utf8');
-      
-      Papa.parse(fileContent, {
+        const fileContent = fs.readFileSync(filePath, 'utf8');
+        
+        Papa.parse(fileContent, {
         header: true,
         dynamicTyping: true,
         skipEmptyLines: true,
+        delimiter: ';',  // ← CAMBIO IMPORTANTE: punto y coma
         complete: (results) => {
-          resolve(results.data);
+            // Limpiar comillas de los headers y valores
+            const cleanedData = results.data.map(row => {
+            const cleanRow = {};
+            Object.keys(row).forEach(key => {
+                const cleanKey = key.replace(/"/g, '').trim();
+                const value = row[key];
+                cleanRow[cleanKey] = typeof value === 'string' ? value.replace(/"/g, '').trim() : value;
+            });
+            return cleanRow;
+            });
+            resolve(cleanedData);
         },
         error: (error) => {
-          reject(new Error(`Error parseando CSV: ${error.message}`));
+            reject(new Error(`Error parseando CSV: ${error.message}`));
         }
-      });
+        });
     });
-  }
+    }
 
   // Parsear archivo Excel
   async parseExcel(filePath) {
