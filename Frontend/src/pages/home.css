@@ -1,0 +1,170 @@
+.menu-container {
+  font-family: 'Segoe UI', sans-serif;
+  background-color: #FFFFFB;
+  min-height: 100vh;
+  min-width: 100vw;
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+  box-shadow: 3px 5px 8px rgba(0, 0, 0, 0.15);
+}
+
+/* Barra superior horizontal */
+.header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  background-color: #287E9C; /* Color de la barra */
+  color: white;
+  padding: 1rem 2rem;
+  width: 100%;
+  box-sizing: border-box;
+}
+
+/* Logo de la app */
+.logo {
+  font-size: 1.5rem;
+  font-weight: bold;
+}
+
+.content {
+  flex: 1;                   /* ocupa el espacio restante */
+  display: flex;
+  flex-direction: column;
+  justify-content: center;   /* centra verticalmente */
+  align-items: flex-start;   /* alineado a la izquierda */
+  padding-left: 3rem;
+}
+
+.section {
+  margin-bottom: 2rem;
+}
+
+.section h3 {
+  margin-bottom: 1rem;
+  color: #333;
+}
+
+.main-content {
+  display: flex;
+  flex: 1;
+  padding: 2rem 3rem;
+  gap: 3rem;
+  box-sizing: border-box;
+}
+
+/* Panel izquierdo */
+.left-panel {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+}
+
+/* Panel derecho (reporte) */
+.report-panel {
+  flex: 1.2;
+  background-color: #F3F6FA;
+  border-radius: 20px;
+  padding: 2rem;
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.1);
+  display: flex;
+  flex-direction: column;
+  justify-content: flex-start;
+}
+
+.report-panel h2 {
+  color: #287E9C;
+  margin-bottom: 1rem;
+}
+
+.report-content {
+  font-size: 1rem;
+  color: #333;
+}
+
+.menu-button {
+  display: flex;
+  align-items: center;
+  gap: 2rem; /* más separación entre ícono y texto */
+  background-color: #FBCB85;
+  border: none;
+  border-radius: 20px;
+  padding: 0.5rem 0.5rem; /* Aumentamos padding */
+  width: 400px; /* Más ancho */
+  text-align: left;
+  font-size: 1.3rem; /* Texto más grande */
+  font-weight: 600;
+  color: #333;
+  cursor: pointer;
+  transition: transform 0.2s, box-shadow 0.2s;
+  box-shadow: 3px 5px 8px rgba(0, 0, 0, 0.15);
+  margin-bottom: 1rem; /* Más espacio entre botones */
+}
+
+.menu-button:hover {
+  transform: translateY(-4px);
+  box-shadow: 5px 7px 12px rgba(0, 0, 0, 0.2);
+}
+
+/* íconos más grandes */
+.icon {
+  width: 48px;
+  height: 48px;
+  color: #287E9C;
+}
+
+/* Botones de pestañas */
+.nav-tabs {
+  display: flex;
+  gap: 1rem; /* Espacio entre botones */
+}
+
+.nav-tabs .tab {
+  background-color: transparent;
+  border: none;
+  color: white;
+  font-size: 1rem;
+  cursor: pointer;
+  padding: 0.5rem 1rem;
+  transition: background-color 0.2s;
+}
+
+.nav-tabs .tab:hover {
+  background-color: rgba(255, 255, 255, 0.2);
+  border-radius: 5px;
+}
+
+/* Contenido de bienvenida */
+.welcome {
+  text-align: center;
+  margin-top: 5vh;
+  padding: 2rem;
+}
+
+.welcome h1 {
+  font-size: 2vw;
+  color: #333;
+}
+
+.welcome p {
+  font-size: 1.5vw;
+  color: #333;
+}
+
+/* Responsive para pantallas pequeñas */
+@media (max-width: 768px) {
+  .welcome h1 {
+    font-size: 6vw;
+  }
+  .welcome p {
+    font-size: 3vw;
+  }
+
+  .nav-tabs .tab {
+    font-size: 0.8rem;
+    padding: 0.4rem 0.8rem;
+  }
+
+}
+
