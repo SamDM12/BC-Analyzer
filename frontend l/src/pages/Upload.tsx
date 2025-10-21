@@ -6,6 +6,7 @@ import { Card } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Progress } from "@/components/ui/progress";
 import { toast } from "sonner";
+import { uploadData } from "@/lib/api";
 
 interface ValidationResult {
   isValid: boolean;
@@ -47,7 +48,6 @@ export default function Upload() {
     setUploading(true);
     setProgress(0);
 
-    // Simulación de progreso de carga
     const interval = setInterval(() => {
       setProgress((prev) => {
         if (prev >= 90) {
@@ -59,40 +59,33 @@ export default function Upload() {
     }, 300);
 
     try {
-      // Aquí iría la llamada real a la API
-      // const formData = new FormData();
-      // formData.append('file', file);
-      // const response = await axios.post('/api/upload', formData);
+      // Llamada REAL a la API
+      const result = await uploadData(file);
+      
+      clearInterval(interval);
+      setProgress(100);
 
-      // Simulación de validación
-      await new Promise(resolve => setTimeout(resolve, 3000));
-
-      // Resultado simulado
-      const mockResult: ValidationResult = {
-        isValid: true,
-        totalRows: 41188,
-        validRows: 40521,
-        errors: [
-          "67 registros con valores nulos en la columna 'duration'",
-          "15 registros con formato de fecha incorrecto",
-        ],
-        warnings: [
-          "Columna 'pdays' contiene 39673 valores con -1 (sin contacto previo)",
-          "Se detectaron 23 valores atípicos en 'age' (mayores a 90)",
-        ],
+      // Mapear respuesta real
+      const validationResult: ValidationResult = {
+        isValid: result.success,
+        totalRows: result.data.reporteCalidad.totalRegistros,
+        validRows: result.data.reporteCalidad.registrosValidos,
+        errors: result.data.reporteCalidad.errores || [],
+        warnings: result.data.reporteCalidad.camposConNulos ? 
+          [`Campos con valores nulos: ${Object.keys(result.data.reporteCalidad.camposConNulos).join(', ')}`] : 
+          [],
       };
 
-      setValidationResult(mockResult);
-      setProgress(100);
-      clearInterval(interval);
+      setValidationResult(validationResult);
 
-      if (mockResult.isValid) {
+      if (validationResult.isValid) {
         toast.success("¡Archivo cargado y validado exitosamente!");
       } else {
         toast.error("El archivo tiene errores críticos de validación");
       }
-    } catch (error) {
-      toast.error("Error al cargar el archivo. Intente nuevamente.");
+    } catch (error: any) {
+      clearInterval(interval);
+      toast.error(error.response?.data?.message || "Error al cargar el archivo. Intente nuevamente.");
       console.error("Upload error:", error);
     } finally {
       setUploading(false);
