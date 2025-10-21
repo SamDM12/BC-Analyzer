@@ -5,17 +5,33 @@ import { Button } from "@/components/ui/button";
 import { Checkbox } from "@/components/ui/checkbox";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { toast } from "sonner";
+import {
+  getAllKPIs,
+  getGeneralMetrics,
+  getMonthDistribution,
+  getContactDistribution,
+  getEducationDistribution,
+  getJobDistribution,
+  type KPIMetrics
+} from "@/lib/api";
+import { generatePDFReport, generateExcelReport } from "@/lib/report-utils";
 
 const availableMetrics = [
-  { id: "conversion", label: "Tasa de Conversión" },
-  { id: "contacts", label: "Número de Contactos" },
-  { id: "distribution", label: "Distribución de Clientes" },
-  { id: "duration", label: "Duración Media de Llamadas" },
-  { id: "channel", label: "Análisis por Canal" },
-  { id: "occupation", label: "Conversión por Ocupación" },
-  { id: "education", label: "Distribución por Educación" },
-  { id: "monthly", label: "Tendencia Mensual" },
+  { id: "conversionRate", label: "Tasa de Conversión" },
+  { id: "totalClients", label: "Total de Contactos" },
+  { id: "totalConversions", label: "Conversiones Exitosas" },
+  { id: "avgDuration", label: "Duración Media De Llamadas" },
+  { id: "avgBalance", label: "Balance Promedio" },
+  { id: "avgCampaign", label: "Campañas Promedio" },
+  { id: "avgPrevious", label: "Contactos Previos Promedio" },
+  { id: "monthTrend", label: "Tendencia de Conversión Mensual" },
+  { id: "contactDistribution", label: "Distribución por Canal de Contacto" },
+  { id: "educationDistribution", label: "Distribución de Clientes por Educación" },
+  { id: "jobConversion", label: "Conversión por Ocupación" },
+  { id: "monthlyContacts", label: "Volumen de Contactos por Mes" },
+  { id: "insights", label: "Insights Clave" }
 ];
+
 
 export default function Report() {
   const [selectedMetrics, setSelectedMetrics] = useState<string[]>([]);
@@ -45,14 +61,116 @@ export default function Report() {
     }
 
     setGenerating(true);
-    
+
     try {
-      // Simulación de generación de reporte
-      await new Promise(resolve => setTimeout(resolve, 2000));
-      
-      toast.success(`Reporte ${format.toUpperCase()} generado y descargado exitosamente`);
-    } catch (error) {
-      toast.error("Error al generar el reporte, intente nuevamente");
+      // Objeto que contendrá los datos para el reporte
+      const reportData: Record<string, any> = {};
+
+      // Cargamos solo lo que el usuario pidió se hacen varias solicitudes en paralelo
+      // Se agrupa por endpoints para minimizar llamadas.
+      const promises: Promise<any>[] = [];
+
+      // Mapas de flags para evitar llamadas redundantes
+      const needsGeneral = selectedMetrics.some(id =>
+          [
+            "conversionRate",
+            "totalClients",
+            "totalConversions",
+            "avgDuration",
+            "avgBalance",
+            "avgCampaign",
+            "avgPrevious",
+            "monthTrend",
+            "insights"
+          ].includes(id) || selectedMetrics.includes("insights")
+    );
+
+      const needsMonthly = selectedMetrics.includes("monthTrend") || selectedMetrics.includes("monthlyContacts");
+      const needsChannel = selectedMetrics.includes("contactDistribution") || selectedMetrics.includes("insights");
+      const needsEducation = selectedMetrics.includes("educationDistribution");
+      const needsOccupation = selectedMetrics.includes("jobConversion");
+
+      // push a las promesas según necesidad
+      if (needsGeneral) promises.push(getGeneralMetrics());
+      if (needsMonthly) promises.push(getMonthDistribution());
+      if (needsChannel) promises.push(getContactDistribution());
+      if (needsEducation) promises.push(getEducationDistribution());
+      if (needsOccupation) promises.push(getJobDistribution());
+
+      // Ejecutamos las promesas en paralelo y esperamos
+      const results = await Promise.allSettled(promises);
+
+      // Recorremos resultados y asignamos al reportData según el orden en que
+      // pusimos las promesas
+      let idx = 0;
+      if (needsGeneral) {
+        const r = results[idx++];
+        if (r.status === "fulfilled") {
+          const data = r.value.data;
+          reportData.general = Object.fromEntries(
+              Object.entries(data).filter(([key]) =>
+                  selectedMetrics.includes(key) || key === "totalDuration" || key === "avgBalance" || key === "totalClients")
+          );
+        } else throw r.reason;
+      }
+      if (needsMonthly) {
+        const r = results[idx++];
+        if (r.status === "fulfilled") reportData.monthly = r.value.data;
+        else throw r.reason;
+      }
+      if (needsChannel) {
+        const r = results[idx++];
+        if (r.status === "fulfilled") reportData.channel = r.value.data;
+        else throw r.reason;
+      }
+      if (needsEducation) {
+        const r = results[idx++];
+        if (r.status === "fulfilled") reportData.education = r.value.data;
+        else throw r.reason;
+      }
+      if (needsOccupation) {
+        const r = results[idx++];
+        if (r.status === "fulfilled") reportData.occupation = r.value.data;
+        else throw r.reason;
+      }
+
+      if (selectedMetrics.includes("insights")) {
+        const general = reportData.general || {};
+        const contactData = reportData.channel || [];
+
+        const bestChannel = contactData.length > 0
+            ? contactData.reduce((prev, curr) =>
+                prev.conversionRate > curr.conversionRate ? prev : curr
+            ).channel
+            : "No disponible";
+
+        const totalDurationValue = general.totalDuration ?? 0;
+        const avgBalanceValue = general.avgBalance ?? 0;
+        const totalClientsValue = general.totalClients ?? 0;
+
+        reportData.insights = {
+          totalDuration: totalDurationValue
+              ? Math.round(totalDurationValue / 60).toLocaleString() + " minutos"
+              : "N/D",
+          bestChannel,
+          totalBalance: avgBalanceValue && totalClientsValue
+              ? `$${(avgBalanceValue * totalClientsValue / 1000000).toFixed(1)}M`
+              : "N/D"
+        };
+      }
+
+      // Llama a la generación del archivo (pdf/excel):
+      if (format === "pdf") {
+         //generatePDFReport debe recibir reportData y selectedMetrics
+        await generatePDFReport(reportData, selectedMetrics);
+      } else {
+        await generateExcelReport(reportData, selectedMetrics);
+      }
+
+      toast.success(`Reporte ${format.toUpperCase()} generado y descargado`);
+    } catch (err: any) {
+      console.error("Error generando reporte:", err);
+      toast.error(err?.message || "Error al generar el reporte");
     } finally {
       setGenerating(false);
     }
