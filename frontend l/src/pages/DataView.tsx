@@ -1,5 +1,5 @@
-import { useState } from "react";
-import { Download, Filter, Save, FolderOpen } from "lucide-react";
+import { useState, useEffect } from "react";
+import { Download, Filter, Save, FolderOpen, X } from "lucide-react";
 import { Card } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -14,44 +14,167 @@ import {
   TableHeader,
   TableRow,
 } from "@/components/ui/table";
-
-// Datos de ejemplo
-const mockData = [
-  { id: 1, age: 56, job: "housemaid", marital: "married", education: "basic.4y", contact: "telephone", month: "may", y: "no" },
-  { id: 2, age: 57, job: "services", marital: "married", education: "high.school", contact: "telephone", month: "may", y: "no" },
-  { id: 3, age: 37, job: "services", marital: "married", education: "high.school", contact: "telephone", month: "may", y: "yes" },
-  { id: 4, age: 40, job: "admin.", marital: "married", education: "basic.6y", contact: "telephone", month: "may", y: "no" },
-  { id: 5, age: 56, job: "services", marital: "married", education: "high.school", contact: "telephone", month: "may", y: "no" },
-  { id: 6, age: 45, job: "services", marital: "married", education: "basic.9y", contact: "telephone", month: "may", y: "no" },
-  { id: 7, age: 59, job: "admin.", marital: "married", education: "professional.course", contact: "telephone", month: "may", y: "no" },
-  { id: 8, age: 41, job: "blue-collar", marital: "married", education: "unknown", contact: "telephone", month: "may", y: "no" },
-];
+import { getData, getFilterOptions, type ClienteData, type FilterParams } from "@/lib/api";
 
 export default function DataView() {
-  const [data] = useState(mockData);
+  const [data, setData] = useState<ClienteData[]>([]);
+  const [loading, setLoading] = useState(false);
+  const [total, setTotal] = useState(0);
   const [currentPage, setCurrentPage] = useState(1);
-  const [selectedFilters, setSelectedFilters] = useState({
-    ageMin: "",
-    ageMax: "",
-    job: "all",
-    education: "all",
-    contact: "all",
-    y: "all",
+  const [totalPages, setTotalPages] = useState(1);
+  const itemsPerPage = 50;
+
+  // Filtros
+  const [selectedFilters, setSelectedFilters] = useState<FilterParams>({
+    ageMin: undefined,
+    ageMax: undefined,
+    job: undefined,
+    education: undefined,
+    contact: undefined,
+    y: undefined,
+    page: 1,
+    limit: itemsPerPage,
+    sortBy: 'age',
+    sortOrder: 'asc'
   });
 
-  const itemsPerPage = 10;
-  const totalPages = Math.ceil(data.length / itemsPerPage);
+  // Opciones de filtros (valores únicos del backend)
+  const [jobOptions, setJobOptions] = useState<string[]>([]);
+  const [educationOptions, setEducationOptions] = useState<string[]>([]);
+  const [contactOptions, setContactOptions] = useState<string[]>([]);
+
+  // Cargar opciones de filtros al montar
+  useEffect(() => {
+    loadFilterOptions();
+  }, []);
+
+  // Cargar datos cuando cambien los filtros o la página
+  useEffect(() => {
+    loadData();
+  }, [selectedFilters, currentPage]);
+
+  const loadFilterOptions = async () => {
+    try {
+      const [jobs, education, contact] = await Promise.all([
+        getFilterOptions('job'),
+        getFilterOptions('education'),
+        getFilterOptions('contact'),
+      ]);
+      
+      setJobOptions(jobs.data.values);
+      setEducationOptions(education.data.values);
+      setContactOptions(contact.data.values);
+    } catch (error) {
+      console.error('Error loading filter options:', error);
+    }
+  };
+
+  const loadData = async () => {
+    setLoading(true);
+    try {
+      const params = {
+        ...selectedFilters,
+        page: currentPage,
+        limit: itemsPerPage,
+      };
+
+      const response = await getData(params);
+      
+      setData(response.data.registros);
+      setTotal(response.data.total);
+      setTotalPages(response.data.totalPaginas);
+    } catch (error: any) {
+      toast.error(error.response?.data?.message || "Error al cargar datos");
+      console.error('Error loading data:', error);
+    } finally {
+      setLoading(false);
+    }
+  };
 
   const handleApplyFilters = () => {
+    setCurrentPage(1);
+    loadData();
     toast.success("Filtros aplicados correctamente");
   };
 
+  const handleClearFilters = () => {
+    setSelectedFilters({
+      ageMin: undefined,
+      ageMax: undefined,
+      job: undefined,
+      education: undefined,
+      contact: undefined,
+      y: undefined,
+      page: 1,
+      limit: itemsPerPage,
+      sortBy: 'age',
+      sortOrder: 'asc'
+    });
+    setCurrentPage(1);
+    toast.success("Filtros limpiados");
+  };
+
   const handleSaveFilter = () => {
+    // Guardar filtro en localStorage para reutilizar
+    const savedFilters = JSON.parse(localStorage.getItem('savedFilters') || '[]');
+    const newFilter = {
+      id: Date.now(),
+      name: `Filtro ${savedFilters.length + 1}`,
+      filters: selectedFilters,
+      date: new Date().toISOString()
+    };
+    savedFilters.push(newFilter);
+    localStorage.setItem('savedFilters', JSON.stringify(savedFilters));
     toast.success("Filtro guardado exitosamente");
   };
 
-  const handleExport = (format: "csv" | "excel") => {
-    toast.success(`Exportando datos en formato ${format.toUpperCase()}...`);
+  const handleExport = async (format: "csv" | "excel") => {
+    try {
+      // Por ahora solo descarga los datos actuales
+      // TODO: Implementar exportación real desde el backend
+      const dataStr = format === 'csv' 
+        ? convertToCSV(data)
+        : JSON.stringify(data, null, 2);
+      
+      const blob = new Blob([dataStr], { 
+        type: format === 'csv' ? 'text/csv' : 'application/json' 
+      });
+      const url = URL.createObjectURL(blob);
+      const link = document.createElement('a');
+      link.href = url;
+      link.download = `datos-${new Date().toISOString()}.${format}`;
+      link.click();
+      
+      toast.success(`Datos exportados en formato ${format.toUpperCase()}`);
+    } catch (error) {
+      toast.error("Error al exportar datos");
+    }
+  };
+
+  const convertToCSV = (data: ClienteData[]) => {
+    if (data.length === 0) return '';
+    
+    const headers = Object.keys(data[0]).filter(key => key !== '_id').join(',');
+    const rows = data.map(row => 
+      Object.entries(row)
+        .filter(([key]) => key !== '_id')
+        .map(([, value]) => value)
+        .join(',')
+    );
+    
+    return [headers, ...rows].join('\n');
+  };
+
+  const handleSort = (field: string) => {
+    const newOrder = selectedFilters.sortBy === field && selectedFilters.sortOrder === 'asc' 
+      ? 'desc' 
+      : 'asc';
+    
+    setSelectedFilters({
+      ...selectedFilters,
+      sortBy: field,
+      sortOrder: newOrder as 'asc' | 'desc'
+    });
   };
 
   return (
@@ -59,10 +182,19 @@ export default function DataView() {
       <div className="flex h-[calc(100vh-4rem)]">
         {/* Sidebar de Filtros */}
         <aside className="w-80 border-r border-border bg-card overflow-y-auto">
-          <div className="sticky top-0 bg-card p-6 border-b border-border">
-            <div className="flex items-center gap-2 mb-4">
-              <Filter className="h-5 w-5 text-primary" />
-              <h2 className="text-lg font-bold text-foreground">Filtros Interactivos</h2>
+          <div className="sticky top-0 bg-card p-6 border-b border-border z-10">
+            <div className="flex items-center justify-between mb-4">
+              <div className="flex items-center gap-2">
+                <Filter className="h-5 w-5 text-primary" />
+                <h2 className="text-lg font-bold text-foreground">Filtros Interactivos</h2>
+              </div>
+              <Button 
+                variant="ghost" 
+                size="sm"
+                onClick={handleClearFilters}
+              >
+                <X className="h-4 w-4" />
+              </Button>
             </div>
           </div>
 
@@ -74,14 +206,20 @@ export default function DataView() {
                 <Input
                   type="number"
                   placeholder="Min"
-                  value={selectedFilters.ageMin}
-                  onChange={(e) => setSelectedFilters({ ...selectedFilters, ageMin: e.target.value })}
+                  value={selectedFilters.ageMin || ''}
+                  onChange={(e) => setSelectedFilters({ 
+                    ...selectedFilters, 
+                    ageMin: e.target.value ? parseInt(e.target.value) : undefined 
+                  })}
                 />
                 <Input
                   type="number"
                   placeholder="Max"
-                  value={selectedFilters.ageMax}
-                  onChange={(e) => setSelectedFilters({ ...selectedFilters, ageMax: e.target.value })}
+                  value={selectedFilters.ageMax || ''}
+                  onChange={(e) => setSelectedFilters({ 
+                    ...selectedFilters, 
+                    ageMax: e.target.value ? parseInt(e.target.value) : undefined 
+                  })}
                 />
               </div>
             </div>
@@ -89,16 +227,21 @@ export default function DataView() {
             {/* Ocupación */}
             <div>
               <label className="mb-2 block text-sm font-medium text-foreground">Ocupación</label>
-              <Select value={selectedFilters.job} onValueChange={(value) => setSelectedFilters({ ...selectedFilters, job: value })}>
+              <Select 
+                value={selectedFilters.job || 'all'} 
+                onValueChange={(value) => setSelectedFilters({ 
+                  ...selectedFilters, 
+                  job: value === 'all' ? undefined : value 
+                })}
+              >
                 <SelectTrigger>
                   <SelectValue placeholder="Seleccionar" />
                 </SelectTrigger>
                 <SelectContent>
                   <SelectItem value="all">Todas</SelectItem>
-                  <SelectItem value="admin.">Administrativo</SelectItem>
-                  <SelectItem value="blue-collar">Operario</SelectItem>
-                  <SelectItem value="services">Servicios</SelectItem>
-                  <SelectItem value="housemaid">Empleada doméstica</SelectItem>
+                  {jobOptions.map(job => (
+                    <SelectItem key={job} value={job}>{job}</SelectItem>
+                  ))}
                 </SelectContent>
               </Select>
             </div>
@@ -106,17 +249,21 @@ export default function DataView() {
             {/* Educación */}
             <div>
               <label className="mb-2 block text-sm font-medium text-foreground">Educación</label>
-              <Select value={selectedFilters.education} onValueChange={(value) => setSelectedFilters({ ...selectedFilters, education: value })}>
+              <Select 
+                value={selectedFilters.education || 'all'} 
+                onValueChange={(value) => setSelectedFilters({ 
+                  ...selectedFilters, 
+                  education: value === 'all' ? undefined : value 
+                })}
+              >
                 <SelectTrigger>
                   <SelectValue placeholder="Seleccionar" />
                 </SelectTrigger>
                 <SelectContent>
                   <SelectItem value="all">Todas</SelectItem>
-                  <SelectItem value="basic.4y">Básica 4 años</SelectItem>
-                  <SelectItem value="basic.6y">Básica 6 años</SelectItem>
-                  <SelectItem value="basic.9y">Básica 9 años</SelectItem>
-                  <SelectItem value="high.school">Secundaria</SelectItem>
-                  <SelectItem value="professional.course">Profesional</SelectItem>
+                  {educationOptions.map(edu => (
+                    <SelectItem key={edu} value={edu}>{edu}</SelectItem>
+                  ))}
                 </SelectContent>
               </Select>
             </div>
@@ -124,14 +271,21 @@ export default function DataView() {
             {/* Canal de Contacto */}
             <div>
               <label className="mb-2 block text-sm font-medium text-foreground">Canal de Contacto</label>
-              <Select value={selectedFilters.contact} onValueChange={(value) => setSelectedFilters({ ...selectedFilters, contact: value })}>
+              <Select 
+                value={selectedFilters.contact || 'all'} 
+                onValueChange={(value) => setSelectedFilters({ 
+                  ...selectedFilters, 
+                  contact: value === 'all' ? undefined : value 
+                })}
+              >
                 <SelectTrigger>
                   <SelectValue placeholder="Seleccionar" />
                 </SelectTrigger>
                 <SelectContent>
                   <SelectItem value="all">Todos</SelectItem>
-                  <SelectItem value="telephone">Teléfono</SelectItem>
-                  <SelectItem value="cellular">Celular</SelectItem>
+                  {contactOptions.map(contact => (
+                    <SelectItem key={contact} value={contact}>{contact}</SelectItem>
+                  ))}
                 </SelectContent>
               </Select>
             </div>
@@ -141,15 +295,27 @@ export default function DataView() {
               <label className="mb-2 block text-sm font-medium text-foreground">¿Suscribió?</label>
               <div className="space-y-2">
                 <div className="flex items-center space-x-2">
-                  <Checkbox id="all" checked={selectedFilters.y === "all"} onCheckedChange={() => setSelectedFilters({ ...selectedFilters, y: "all" })} />
+                  <Checkbox 
+                    id="all" 
+                    checked={!selectedFilters.y} 
+                    onCheckedChange={() => setSelectedFilters({ ...selectedFilters, y: undefined })} 
+                  />
                   <label htmlFor="all" className="text-sm text-foreground">Todos</label>
                 </div>
                 <div className="flex items-center space-x-2">
-                  <Checkbox id="yes" checked={selectedFilters.y === "yes"} onCheckedChange={() => setSelectedFilters({ ...selectedFilters, y: "yes" })} />
+                  <Checkbox 
+                    id="yes" 
+                    checked={selectedFilters.y === 'yes'} 
+                    onCheckedChange={() => setSelectedFilters({ ...selectedFilters, y: 'yes' })} 
+                  />
                   <label htmlFor="yes" className="text-sm text-foreground">Sí</label>
                 </div>
                 <div className="flex items-center space-x-2">
-                  <Checkbox id="no" checked={selectedFilters.y === "no"} onCheckedChange={() => setSelectedFilters({ ...selectedFilters, y: "no" })} />
+                  <Checkbox 
+                    id="no" 
+                    checked={selectedFilters.y === 'no'} 
+                    onCheckedChange={() => setSelectedFilters({ ...selectedFilters, y: 'no' })} 
+                  />
                   <label htmlFor="no" className="text-sm text-foreground">No</label>
                 </div>
               </div>
@@ -157,8 +323,8 @@ export default function DataView() {
 
             {/* Botones de Acción */}
             <div className="space-y-2 pt-4 border-t border-border">
-              <Button onClick={handleApplyFilters} className="w-full" size="lg">
-                Aplicar Filtros
+              <Button onClick={handleApplyFilters} className="w-full" size="lg" disabled={loading}>
+                {loading ? "Aplicando..." : "Aplicar Filtros"}
               </Button>
               <Button onClick={handleSaveFilter} variant="outline" className="w-full">
                 <Save className="mr-2 h-4 w-4" />
@@ -177,7 +343,7 @@ export default function DataView() {
           <div className="mb-6 flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
             <div>
               <h1 className="text-2xl font-bold text-foreground">Explorador de Datos</h1>
-              <p className="text-muted-foreground">41,188 registros totales</p>
+              <p className="text-muted-foreground">{total.toLocaleString()} registros totales</p>
             </div>
 
             <div className="flex gap-2">
@@ -197,35 +363,64 @@ export default function DataView() {
               <Table>
                 <TableHeader>
                   <TableRow>
-                    <TableHead className="w-12">#</TableHead>
-                    <TableHead>Edad</TableHead>
-                    <TableHead>Ocupación</TableHead>
+                    <TableHead 
+                      className="cursor-pointer hover:bg-muted"
+                      onClick={() => handleSort('age')}
+                    >
+                      Edad {selectedFilters.sortBy === 'age' && (selectedFilters.sortOrder === 'asc' ? '↑' : '↓')}
+                    </TableHead>
+                    <TableHead 
+                      className="cursor-pointer hover:bg-muted"
+                      onClick={() => handleSort('job')}
+                    >
+                      Ocupación {selectedFilters.sortBy === 'job' && (selectedFilters.sortOrder === 'asc' ? '↑' : '↓')}
+                    </TableHead>
                     <TableHead>Estado Civil</TableHead>
                     <TableHead>Educación</TableHead>
+                    <TableHead 
+                      className="cursor-pointer hover:bg-muted"
+                      onClick={() => handleSort('balance')}
+                    >
+                      Balance {selectedFilters.sortBy === 'balance' && (selectedFilters.sortOrder === 'asc' ? '↑' : '↓')}
+                    </TableHead>
                     <TableHead>Contacto</TableHead>
                     <TableHead>Mes</TableHead>
                     <TableHead>Suscribió</TableHead>
                   </TableRow>
                 </TableHeader>
                 <TableBody>
-                  {data.map((row) => (
-                    <TableRow key={row.id}>
-                      <TableCell className="font-medium">{row.id}</TableCell>
-                      <TableCell>{row.age}</TableCell>
-                      <TableCell>{row.job}</TableCell>
-                      <TableCell>{row.marital}</TableCell>
-                      <TableCell>{row.education}</TableCell>
-                      <TableCell>{row.contact}</TableCell>
-                      <TableCell>{row.month}</TableCell>
-                      <TableCell>
-                        <span className={`inline-flex rounded-full px-2 py-1 text-xs font-medium ${
-                          row.y === "yes" ? "bg-green-100 text-green-700" : "bg-red-100 text-red-700"
-                        }`}>
-                          {row.y === "yes" ? "Sí" : "No"}
-                        </span>
+                  {loading ? (
+                    <TableRow>
+                      <TableCell colSpan={8} className="text-center py-8">
+                        Cargando datos...
                       </TableCell>
                     </TableRow>
-                  ))}
+                  ) : data.length === 0 ? (
+                    <TableRow>
+                      <TableCell colSpan={8} className="text-center py-8">
+                        No hay datos disponibles
+                      </TableCell>
+                    </TableRow>
+                  ) : (
+                    data.map((row) => (
+                      <TableRow key={row._id}>
+                        <TableCell className="font-medium">{row.age}</TableCell>
+                        <TableCell>{row.job}</TableCell>
+                        <TableCell>{row.marital}</TableCell>
+                        <TableCell>{row.education}</TableCell>
+                        <TableCell>${row.balance.toLocaleString()}</TableCell>
+                        <TableCell>{row.contact}</TableCell>
+                        <TableCell>{row.month}</TableCell>
+                        <TableCell>
+                          <span className={`inline-flex rounded-full px-2 py-1 text-xs font-medium ${
+                            row.y === "yes" ? "bg-green-100 text-green-700" : "bg-red-100 text-red-700"
+                          }`}>
+                            {row.y === "yes" ? "Sí" : "No"}
+                          </span>
+                        </TableCell>
+                      </TableRow>
+                    ))
+                  )}
                 </TableBody>
               </Table>
             </div>
@@ -233,22 +428,25 @@ export default function DataView() {
             {/* Paginación */}
             <div className="flex items-center justify-between border-t border-border px-6 py-4">
               <p className="text-sm text-muted-foreground">
-                Mostrando {(currentPage - 1) * itemsPerPage + 1} - {Math.min(currentPage * itemsPerPage, data.length)} de {data.length}
+                Mostrando {((currentPage - 1) * itemsPerPage) + 1} - {Math.min(currentPage * itemsPerPage, total)} de {total.toLocaleString()}
               </p>
               <div className="flex gap-2">
                 <Button
                   variant="outline"
                   size="sm"
                   onClick={() => setCurrentPage(Math.max(1, currentPage - 1))}
-                  disabled={currentPage === 1}
+                  disabled={currentPage === 1 || loading}
                 >
                   Anterior
                 </Button>
+                <span className="px-3 py-1 text-sm">
+                  Página {currentPage} de {totalPages}
+                </span>
                 <Button
                   variant="outline"
                   size="sm"
                   onClick={() => setCurrentPage(Math.min(totalPages, currentPage + 1))}
-                  disabled={currentPage === totalPages}
+                  disabled={currentPage === totalPages || loading}
                 >
                   Siguiente
                 </Button>
