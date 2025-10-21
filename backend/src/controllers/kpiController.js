@@ -214,6 +214,40 @@ class KPIController {
       });
     }
   }
+
+  // GET /api/kpis/cards - KPIs principales para el dashboard
+  async getDashboardKPIs(req, res) {
+    try {
+      const filters = buildFilters(req.query);
+
+      // Traer los datos necesarios
+      const conversionRateData = await kpiService.getConversionRate(filters);
+      const generalMetrics = await kpiService.getGeneralMetrics(filters);
+
+      // Duración media de llamadas exitosas (solo y: 'yes')
+      const avgDurationSuccessful = await kpiService.getAvgDurationSuccessfulCalls(filters);
+
+      // Preparar la respuesta
+      const kpis = {
+        conversionRate: conversionRateData.conversionRate, // %
+        totalContacts: generalMetrics.totalClients,
+        successfulCalls: generalMetrics.totalConversions,
+        avgDuration: avgDurationSuccessful // en segundos
+      };
+
+      res.status(200).json({
+        success: true,
+        data: kpis
+      });
+    } catch (error) {
+      console.error('Error en getDashboardKPIs:', error);
+      res.status(500).json({
+        success: false,
+        message: 'Error al obtener KPIs del dashboard',
+        error: error.message
+      });
+    }
+  }
 }
 
 export default new KPIController();

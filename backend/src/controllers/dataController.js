@@ -49,6 +49,9 @@ class DataController {
         .map(row => dataValidation.transformData(row));
 
       // Paso 5: Limpiar datos existentes (opcional - comentar si quieres mantener datos previos)
+      console.log('🗑️ Limpiando datos anteriores...');
+      const deleteResult = await Cliente.deleteMany({});
+      console.log(`✅ ${deleteResult.deletedCount} registros anteriores eliminados`);
       // await Cliente.deleteMany({});
 
       // Paso 6: Insertar en base de datos

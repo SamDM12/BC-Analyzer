@@ -30,4 +30,6 @@ router.get('/marital', kpiController.getMaritalDistribution);
 // GET /api/kpis/campaign - Análisis de campañas
 router.get('/campaign', kpiController.getCampaignAnalysis);
 
+// GET /api/kpis/cards - KPIs para dashboard
+router.get('/cards', kpiController.getDashboardKPIs);
 export default router;
