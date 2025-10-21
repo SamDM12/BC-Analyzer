@@ -2,7 +2,8 @@ import express from 'express';
 import cors from 'cors';
 import dotenv from 'dotenv';
 import connectDB from './config/database.js';
-import dataRoutes from './routes/dataRoutes.js';  // ← NUEVO
+import dataRoutes from './routes/dataRoutes.js'; 
+import kpiRoutes from './routes/kpiRoutes.js';
 
 dotenv.config();
 
@@ -23,13 +24,15 @@ app.get('/', (req, res) => {
     endpoints: {
       data: '/api/data',
       upload: '/api/data/upload',
-      stats: '/api/data/stats'
+      stats: '/api/data/stats',
+      kpis: '/api/kpis'
     }
   });
 });
 
-// Rutas de la API  ← NUEVO
+// Rutas de la API 
 app.use('/api/data', dataRoutes);
+app.use('/api/kpis', kpiRoutes);
 
 // Conectar a la base de datos e iniciar servidor
 connectDB().then(() => {
