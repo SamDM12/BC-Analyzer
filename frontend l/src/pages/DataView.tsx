@@ -7,6 +7,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { Checkbox } from "@/components/ui/checkbox";
 import { toast } from "sonner";
 import { generateSummary } from "@/utils/filterUtils";
+import * as XLSX from "xlsx";
 import {
   Table,
   TableBody,
@@ -206,28 +207,32 @@ export default function DataView() {
     }
   };
 
-  const handleExport = async (format: "csv" | "excel") => {
+  const handleExport = async (format: "csv" | "xlsx") => {
     try {
-      // Por ahora solo descarga los datos actuales
-      // TODO: Implementar exportación real desde el backend
-      const dataStr = format === 'csv' 
-        ? convertToCSV(data)
-        : JSON.stringify(data, null, 2);
-      
-      const blob = new Blob([dataStr], { 
-        type: format === 'csv' ? 'text/csv' : 'application/json' 
-      });
-      const url = URL.createObjectURL(blob);
-      const link = document.createElement('a');
-      link.href = url;
-      link.download = `datos-${new Date().toISOString()}.${format}`;
-      link.click();
-      
+      if (format === "csv") {
+        const dataStr = convertToCSV(data);
+        const blob = new Blob([dataStr], { type: "text/csv" });
+        const url = URL.createObjectURL(blob);
+        const link = document.createElement("a");
+        link.href = url;
+        link.download = `datos-${new Date().toISOString()}.csv`;
+        link.click();
+      } else {
+        // Crear workbook
+        const ws = XLSX.utils.json_to_sheet(data);
+        const wb = XLSX.utils.book_new();
+        XLSX.utils.book_append_sheet(wb, ws, "Datos");
+
+        // Generar archivo y descargar
+        XLSX.writeFile(wb, `datos-${new Date().toISOString()}.xlsx`);
+      }
+
       toast.success(`Datos exportados en formato ${format.toUpperCase()}`);
     } catch (error) {
       toast.error("Error al exportar datos");
     }
   };
+
 
   const convertToCSV = (data: ClienteData[]) => {
     if (data.length === 0) return '';
@@ -464,7 +469,7 @@ export default function DataView() {
                 <Download className="mr-2 h-4 w-4" />
                 Exportar CSV
               </Button>
-              <Button onClick={() => handleExport("excel")} variant="outline">
+              <Button onClick={() => handleExport("xlsx")} variant="outline">
                 <Download className="mr-2 h-4 w-4" />
                 Exportar Excel
               </Button>
