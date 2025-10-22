@@ -97,6 +97,13 @@ export default function DataView() {
     }
   };
 
+  //Se asegura de no quedar en una página inválida
+  useEffect(() => {
+    if (currentPage > totalPages) {
+      setCurrentPage(1);
+    }
+  }, [totalPages]);
+
   const loadData = async () => {
     setLoading(true);
     try {
@@ -287,22 +294,67 @@ export default function DataView() {
               <label className="mb-2 block text-sm font-medium text-foreground">Edad</label>
               <div className="flex gap-2">
                 <Input
-                  type="number"
-                  placeholder="Min"
-                  value={selectedFilters.ageMin || ''}
-                  onChange={(e) => setSelectedFilters({ 
-                    ...selectedFilters, 
-                    ageMin: e.target.value ? parseInt(e.target.value) : undefined 
-                  })}
+                    type="number"
+                    placeholder="Min"
+                    min={1} // 👈 impide valores menores a 1 en el input
+                    value={selectedFilters.ageMin ?? ''}
+                    onChange={(e) => {
+                      const value = parseInt(e.target.value, 10);
+
+                      // Evita negativos o vacíos
+                      if (isNaN(value) || value < 1) {
+                        setSelectedFilters({
+                          ...selectedFilters,
+                          ageMin: undefined
+                        });
+                        return;
+                      }
+
+                      // Si el máximo actual es menor, lo ajustamos
+                      if (selectedFilters.ageMax && value > selectedFilters.ageMax) {
+                        setSelectedFilters({
+                          ...selectedFilters,
+                          ageMin: value,
+                          ageMax: value
+                        });
+                      } else {
+                        setSelectedFilters({
+                          ...selectedFilters,
+                          ageMin: value
+                        });
+                      }
+                    }}
                 />
                 <Input
-                  type="number"
-                  placeholder="Max"
-                  value={selectedFilters.ageMax || ''}
-                  onChange={(e) => setSelectedFilters({ 
-                    ...selectedFilters, 
-                    ageMax: e.target.value ? parseInt(e.target.value) : undefined 
-                  })}
+                    type="number"
+                    placeholder="Max"
+                    min={selectedFilters.ageMin || 1} // 👈 el mínimo permitido del max depende del min actual
+                    value={selectedFilters.ageMax ?? ''}
+                    onChange={(e) => {
+                      const value = parseInt(e.target.value, 10);
+
+                      // Evita negativos o vacíos
+                      if (isNaN(value) || value < 1) {
+                        setSelectedFilters({
+                          ...selectedFilters,
+                          ageMax: undefined
+                        });
+                        return;
+                      }
+
+                      // Si el máximo es menor que el mínimo actual → ajustamos
+                      if (selectedFilters.ageMin && value < selectedFilters.ageMin) {
+                        setSelectedFilters({
+                          ...selectedFilters,
+                          ageMax: selectedFilters.ageMin
+                        });
+                      } else {
+                        setSelectedFilters({
+                          ...selectedFilters,
+                          ageMax: value
+                        });
+                      }
+                    }}
                 />
               </div>
             </div>
