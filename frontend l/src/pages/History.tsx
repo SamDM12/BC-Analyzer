@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { Clock, Filter, ChevronRight } from "lucide-react";
 import { Card } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
@@ -20,48 +20,65 @@ interface Query {
   summary: string;
 }
 
-const mockQueries: Query[] = [
-  {
-    id: 1,
-    date: "2024-01-15",
-    time: "14:30",
-    filters: {
-      age: "30-45",
-      job: "admin.",
-      education: "university.degree",
-    },
-    results: 3245,
-    summary: "Clientes administrativos con educación universitaria entre 30 y 45 años",
-  },
-  {
-    id: 2,
-    date: "2024-01-14",
-    time: "10:15",
-    filters: {
-      contact: "cellular",
-      job: "services",
-    },
-    results: 5621,
-    summary: "Contactos por celular en el sector servicios",
-  },
-  {
-    id: 3,
-    date: "2024-01-13",
-    time: "16:45",
-    filters: {
-      age: "50+",
-      education: "basic.9y",
-    },
-    results: 2134,
-    summary: "Clientes mayores de 50 años con educación básica",
-  },
-];
+function generateSummary(filters) {
+  const parts = [];
+
+  // Edad
+  if (filters.ageMin && filters.ageMax)
+    parts.push(`personas entre ${filters.ageMin} y ${filters.ageMax} años`);
+  else if (filters.ageMin)
+    parts.push(`personas mayores de ${filters.ageMin} años`);
+  else if (filters.ageMax)
+    parts.push(`personas menores de ${filters.ageMax} años`);
+
+  // Ocupación
+  if (filters.job)
+    parts.push(`con ocupación "${filters.job}"`);
+
+  // Educación
+  if (filters.education)
+    parts.push(`con nivel educativo "${filters.education}"`);
+
+  // Canal de contacto
+  if (filters.contact)
+    parts.push(`contactadas por ${filters.contact.toLowerCase()}`);
+
+  // Resultado (y)
+  if (filters.y === "yes")
+    parts.push("que se suscribieron");
+  else if (filters.y === "no")
+    parts.push("que no se suscribieron");
+
+  // Resultado final
+  if (parts.length === 0) return "Sin filtros aplicados";
+
+  const summary =
+    parts.length === 1
+      ? parts[0]
+      : parts.slice(0, -1).join(", ") + " y " + parts[parts.length - 1];
+
+  return summary.charAt(0).toUpperCase() + summary.slice(1) + ".";
+}
 
 export default function History() {
   const navigate = useNavigate();
-  const [queries] = useState<Query[]>(mockQueries);
+  const [queries, setQueries] = useState<Query[]>([]);
   const [selectedQuery, setSelectedQuery] = useState<Query | null>(null);
   const [isDialogOpen, setIsDialogOpen] = useState(false);
+
+  useEffect(() => {
+  const savedFilters = JSON.parse(localStorage.getItem('historyQueries') || '[]');
+  // Adaptamos el formato a tu interfaz Query
+  const formatted = savedFilters.map((f: any) => ({
+    id: f.id,
+    date: new Date(f.date).toISOString().split('T')[0],
+    time: new Date(f.date).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
+    filters: f.filters,
+    results: f.results,
+    summary: generateSummary(f.filters),
+  }));
+  setQueries(formatted);
+  }, []);
 
   const handleViewDetails = (query: Query) => {
     setSelectedQuery(query);
@@ -69,12 +86,12 @@ export default function History() {
   };
 
   const handleReplicateQuery = (query: Query) => {
-    toast.success("Replicando consulta...");
-    // Aquí se aplicarían los filtros en el estado global o localStorage
-    setTimeout(() => {
-      navigate("/data-view");
-    }, 1000);
-  };
+  toast.success("Replicando consulta...");
+  localStorage.setItem('replicatedFilter', JSON.stringify(query.filters));
+  setTimeout(() => {
+    navigate("/data-view");
+  }, 1000);
+};
 
   return (
     <div className="min-h-screen bg-background p-4 sm:p-6 lg:p-8">
