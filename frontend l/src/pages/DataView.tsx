@@ -6,6 +6,7 @@ import { Input } from "@/components/ui/input";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Checkbox } from "@/components/ui/checkbox";
 import { toast } from "sonner";
+import { generateSummary } from "@/utils/filterUtils";
 import {
   Table,
   TableBody,
@@ -15,6 +16,12 @@ import {
   TableRow,
 } from "@/components/ui/table";
 import { getData, getFilterOptions, type ClienteData, type FilterParams } from "@/lib/api";
+import {
+  Dialog,
+  DialogContent,
+  DialogHeader,
+  DialogTitle,
+} from "@/components/ui/dialog";
 
 export default function DataView() {
   const [data, setData] = useState<ClienteData[]>([]);
@@ -22,6 +29,8 @@ export default function DataView() {
   const [total, setTotal] = useState(0);
   const [currentPage, setCurrentPage] = useState(1);
   const [totalPages, setTotalPages] = useState(1);
+  const [isLoadDialogOpen, setIsLoadDialogOpen] = useState(false);
+  const [savedFiltersList, setSavedFiltersList] = useState<any[]>([]);
   const itemsPerPage = 50;
 
   // Filtros
@@ -42,6 +51,24 @@ export default function DataView() {
   const [jobOptions, setJobOptions] = useState<string[]>([]);
   const [educationOptions, setEducationOptions] = useState<string[]>([]);
   const [contactOptions, setContactOptions] = useState<string[]>([]);
+
+  useEffect(() => {
+    const replicated = localStorage.getItem('replicatedFilter');
+    if (replicated) {
+      try {
+        const parsed = JSON.parse(replicated);
+        setSelectedFilters((prev) => ({
+          ...prev,
+          ...parsed,
+          page: 1
+        }));
+        toast.success("Filtro replicado desde historial");
+        localStorage.removeItem('replicatedFilter');
+      } catch {
+        console.error("Error al cargar filtro replicado");
+      }
+    }
+  }, []);
 
   // Cargar opciones de filtros al montar
   useEffect(() => {
@@ -91,11 +118,27 @@ export default function DataView() {
     }
   };
 
-  const handleApplyFilters = () => {
-    setCurrentPage(1);
-    loadData();
-    toast.success("Filtros aplicados correctamente");
-  };
+  const handleApplyFilters = async () => {
+  setCurrentPage(1);
+  await loadData();
+  toast.success("Filtros aplicados correctamente");
+
+  try {
+    const history = JSON.parse(localStorage.getItem("historyQueries") || "[]");
+
+    const newEntry = {
+      id: Date.now(),
+      filters: selectedFilters,
+      date: new Date().toISOString(),
+      results: total,
+    };
+
+    history.push(newEntry);
+    localStorage.setItem("historyQueries", JSON.stringify(history));
+  } catch (error) {
+    console.error("Error al guardar en historial:", error);
+  }
+};
 
   const handleClearFilters = () => {
     setSelectedFilters({
@@ -114,18 +157,53 @@ export default function DataView() {
     toast.success("Filtros limpiados");
   };
 
+  const loadSavedFilters = () => {
+    try {
+      const saved = JSON.parse(localStorage.getItem('savedFilters') || '[]');
+      setSavedFiltersList(saved);
+      setIsLoadDialogOpen(true);
+    } catch (error) {
+      console.error('Error al cargar filtros guardados:', error);
+      toast.error('No se pudieron cargar los filtros guardados');
+    }
+  };
+
+  const handleLoadFilter = (filters: FilterParams) => {
+    setSelectedFilters({ ...selectedFilters, ...filters, page: 1 });
+    setIsLoadDialogOpen(false);
+    toast.success("Filtro cargado correctamente");
+  };
+
+
   const handleSaveFilter = () => {
-    // Guardar filtro en localStorage para reutilizar
-    const savedFilters = JSON.parse(localStorage.getItem('savedFilters') || '[]');
-    const newFilter = {
-      id: Date.now(),
-      name: `Filtro ${savedFilters.length + 1}`,
-      filters: selectedFilters,
-      date: new Date().toISOString()
-    };
-    savedFilters.push(newFilter);
-    localStorage.setItem('savedFilters', JSON.stringify(savedFilters));
-    toast.success("Filtro guardado exitosamente");
+    try {
+      const savedFilters = JSON.parse(localStorage.getItem('savedFilters') || '[]');
+
+      const exists = savedFilters.some(
+        (f) => JSON.stringify(f.filters) === JSON.stringify(selectedFilters)
+      );
+
+      if (exists) {
+        toast.info("Este filtro ya está guardado en tus filtros favoritos");
+        return;
+      }
+
+      const newFilter = {
+        id: Date.now(),
+        name: `Filtro ${savedFilters.length + 1}`,
+        filters: selectedFilters,
+        date: new Date().toISOString(),
+        results: total,
+      };
+
+      savedFilters.push(newFilter);
+      localStorage.setItem('savedFilters', JSON.stringify(savedFilters));
+
+      toast.success("Filtro guardado en tus favoritos");
+    } catch (error) {
+      console.error("Error al guardar filtro:", error);
+      toast.error("No se pudo guardar el filtro");
+    }
   };
 
   const handleExport = async (format: "csv" | "excel") => {
@@ -330,15 +408,50 @@ export default function DataView() {
                 <Save className="mr-2 h-4 w-4" />
                 Guardar Filtro
               </Button>
-              <Button variant="outline" className="w-full">
+              <Button variant="outline" className="w-full" onClick={loadSavedFilters}>
                 <FolderOpen className="mr-2 h-4 w-4" />
                 Cargar Filtro
               </Button>
             </div>
           </div>
         </aside>
+        <Dialog open={isLoadDialogOpen} onOpenChange={setIsLoadDialogOpen}>
+          <DialogContent className="sm:max-w-lg max-h-[80vh] overflow-y-auto">
+            <DialogHeader>
+              <DialogTitle>Filtros Guardados</DialogTitle>
+            </DialogHeader>
+
+            {savedFiltersList.length > 0 ? (
+              <div className="space-y-3">
+                {savedFiltersList.map((f) => (
+                  <Card
+                    key={f.id}
+                    className="p-4 hover:bg-muted/50 transition cursor-pointer"
+                    onClick={() => handleLoadFilter(f.filters)}
+                  >
+                    <p className="font-medium text-foreground">{f.name}</p>
+                    <p className="text-xs text-muted-foreground">
+                      {new Date(f.date).toLocaleString()}
+                    </p>
+                    <p className="text-sm text-muted-foreground">
+                      {generateSummary(f.filters)}
+                    </p>
+                    <p className="text-sm mt-1 text-muted-foreground">
+                      {f.results?.toLocaleString() ?? 0} resultados
+                    </p>
+                  </Card>
+                ))}
+              </div>
+            ) : (
+              <p className="text-center text-muted-foreground py-4">
+                No hay filtros guardados.
+              </p>
+            )}
+          </DialogContent>
+        </Dialog>
 
         {/* Contenido Principal */}
+        
         <main className="flex-1 overflow-y-auto p-6">
           <div className="mb-6 flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
             <div>
