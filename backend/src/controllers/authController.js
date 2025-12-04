@@ -1,0 +1,58 @@
+import bcrypt from "bcrypt";
+import Usuario from "../models/Usuario.js";
+import Role from "../models/Role.js";
+import jwt from "jsonwebtoken";
+
+export const register = async (req, res) => {
+    try {
+        const { nombre, email, password, roleName } = req.body;
+
+        // Buscamos rol por nombre; si no viene, asignamos EJECUTIVO
+        const defaultRoleName = roleName || "EJECUTIVO";
+        const role = await Role.findOne({ name: defaultRoleName });
+        if (!role) return res.status(400).json({ error: "Rol no encontrado" });
+
+        // hashear contraseña
+        const salt = await bcrypt.genSalt(10);
+        const hashed = await bcrypt.hash(password, salt);
+
+        const usuario = await Usuario.create({
+            nombre,
+            email,
+            password: hashed,
+            role: role._id
+        });
+
+        res.status(201).json(usuario); // toJSON eliminará password
+    } catch (err) {
+        console.error(err);
+        res.status(500).json({ error: "Error al registrar usuario" });
+    }
+};
+
+export const login = async (req, res) => {
+    try {
+        const { email, password } = req.body;
+        const usuario = await Usuario.findOne({ email }).populate("role");
+
+        if (!usuario) return res.status(400).json({ error: "Credenciales inválidas" });
+
+        const match = await bcrypt.compare(password, usuario.password);
+        if (!match) return res.status(400).json({ error: "Credenciales inválidas" });
+
+        // Payload: id, nombre, role, permissions
+        const payload = {
+            id: usuario._id,
+            nombre: usuario.nombre,
+            role: usuario.role.name,
+            permissions: usuario.role.permissions
+        };
+
+        const token = jwt.sign(payload, process.env.JWT_SECRET, { expiresIn: "2h" });
+
+        res.json({ token, user: usuario.toJSON(), role: usuario.role.name, permissions: usuario.role.permissions });
+    } catch (err) {
+        console.error(err);
+        res.status(500).json({ error: "Error en login" });
+    }
+};
