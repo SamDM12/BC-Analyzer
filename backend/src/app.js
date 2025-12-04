@@ -4,6 +4,7 @@ import dotenv from 'dotenv';
 import connectDB from './config/database.js';
 import dataRoutes from './routes/dataRoutes.js'; 
 import kpiRoutes from './routes/kpiRoutes.js';
+import roleRoutes from './routes/roleRoutes.js';
 
 dotenv.config();
 
@@ -33,6 +34,7 @@ app.get('/', (req, res) => {
 // Rutas de la API 
 app.use('/api/data', dataRoutes);
 app.use('/api/kpis', kpiRoutes);
+app.use('/api/roles', roleRoutes);
 
 // Conectar a la base de datos e iniciar servidor
 connectDB().then(() => {
