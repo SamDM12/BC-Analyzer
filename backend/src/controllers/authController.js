@@ -33,26 +33,46 @@ export const register = async (req, res) => {
 export const login = async (req, res) => {
     try {
         const { email, password } = req.body;
-        const usuario = await Usuario.findOne({ email }).populate("role");
 
-        if (!usuario) return res.status(400).json({ error: "Credenciales inválidas" });
+        const usuario = await Usuario.findOne({ email }).populate("role");
+        if (!usuario) return res.status(400).json({ message: "Credenciales inválidas" });
 
         const match = await bcrypt.compare(password, usuario.password);
-        if (!match) return res.status(400).json({ error: "Credenciales inválidas" });
+        if (!match) return res.status(400).json({ message: "Credenciales inválidas" });
 
-        // Payload: id, nombre, role, permissions
+        // Mapear rol de la BD al frontend
+        const roleMap = {
+            "GERENCIA": "Gerencia",
+            "EJECUTIVO": "Ejecutivo de cuentas"
+        };
+
+        const formattedRole = roleMap[usuario.role.name] || "Ejecutivo de cuentas";
+
+        // Crear token JWT
         const payload = {
             id: usuario._id,
-            nombre: usuario.nombre,
-            role: usuario.role.name,
+            name: usuario.nombre,
+            role: formattedRole,
             permissions: usuario.role.permissions
         };
 
         const token = jwt.sign(payload, process.env.JWT_SECRET, { expiresIn: "2h" });
 
-        res.json({ token, user: usuario.toJSON(), role: usuario.role.name, permissions: usuario.role.permissions });
+        // -------- Formato EXACTO que espera el frontend --------
+        const userResponse = {
+            id: usuario._id,
+            name: usuario.nombre,
+            email: usuario.email,
+            role: formattedRole,
+            permissions: usuario.role.permissions,
+            isActive: usuario.activo ?? true,   // fallback si tu schema no lo implementa
+            createdAt: usuario.createdAt
+        };
+
+        return res.json({ token, user: userResponse });
+
     } catch (err) {
         console.error(err);
-        res.status(500).json({ error: "Error en login" });
+        res.status(500).json({ message: "Error en login" });
     }
 };

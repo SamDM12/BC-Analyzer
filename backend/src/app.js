@@ -5,6 +5,8 @@ import connectDB from './config/database.js';
 import dataRoutes from './routes/dataRoutes.js'; 
 import kpiRoutes from './routes/kpiRoutes.js';
 import roleRoutes from './routes/roleRoutes.js';
+import authRoutes from "./routes/authRoutes.js";
+import facadeRoutes from './routes/facade.js';
 
 dotenv.config();
 
@@ -12,7 +14,10 @@ const app = express();
 const PORT = process.env.PORT || 5000;
 
 // Middlewares
-app.use(cors());
+app.use(cors({
+  origin: process.env.FRONTEND_URL || 'http://localhost:5173', // Puerto típico de Vite
+  credentials: true
+}));
 app.use(express.json());
 app.use(express.urlencoded({ extended: true }));
 
@@ -35,6 +40,8 @@ app.get('/', (req, res) => {
 app.use('/api/data', dataRoutes);
 app.use('/api/kpis', kpiRoutes);
 app.use('/api/roles', roleRoutes);
+app.use("/api/auth", authRoutes);
+app.use('/api/facade', facadeRoutes);
 
 // Conectar a la base de datos e iniciar servidor
 connectDB().then(() => {
