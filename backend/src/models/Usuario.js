@@ -21,12 +21,12 @@ const usuarioSchema = new mongoose.Schema({
     minlength: [6, 'La contraseña debe tener al menos 6 caracteres']
   },
   tipoUsuario: {
-    type: String,
-    enum: {
-      values: ['DIRECTIVO', 'ANALISTA_DATOS', 'EQUIPO_TECNICO'],
-      message: '{VALUE} no es un tipo de usuario válido'
-    },
-    default: 'ANALISTA_DATOS'
+  type: String,
+  enum: {
+    values: ['GERENCIA', 'EJECUTIVO'],
+    message: '{VALUE} no es un tipo de usuario válido'
+  },
+  default: 'EJECUTIVO'
   },
   activo: {
     type: Boolean,
