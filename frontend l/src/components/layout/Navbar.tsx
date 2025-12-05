@@ -1,5 +1,13 @@
-import { Link, useLocation } from "react-router-dom";
-import { BarChart3, Upload, Database, PieChart, FileText, History } from "lucide-react";
+import { Link, useLocation, useNavigate } from "react-router-dom";
+import {
+  BarChart3,
+  Upload,
+  Database,
+  PieChart,
+  FileText,
+  History,
+  LogOut,
+} from "lucide-react";
 import { cn } from "@/lib/utils";
 
 const navigation = [
@@ -12,6 +20,13 @@ const navigation = [
 
 export function Navbar() {
   const location = useLocation();
+  const navigate = useNavigate();
+
+  const handleLogout = () => {
+    localStorage.removeItem("token");
+    localStorage.removeItem("rol");
+    navigate("/login");
+  };
 
   return (
     <nav className="bg-card border-b border-border sticky top-0 z-50 shadow-md">
@@ -33,7 +48,7 @@ export function Navbar() {
             {navigation.map((item) => {
               const Icon = item.icon;
               const isActive = location.pathname === item.href;
-              
+
               return (
                 <Link
                   key={item.name}
@@ -50,9 +65,18 @@ export function Navbar() {
                 </Link>
               );
             })}
+
+            {/* 🔥 Logout button (desktop) */}
+            <button
+              onClick={handleLogout}
+              className="flex items-center gap-2 rounded-lg px-4 py-2 text-sm font-medium text-red-500 hover:bg-red-100 transition-base"
+            >
+              <LogOut className="h-4 w-4" />
+              Cerrar sesión
+            </button>
           </div>
 
-          {/* Mobile menu button */}
+          {/* Mobile menu icon (placeholder) */}
           <div className="md:hidden">
             <button className="rounded-lg p-2 text-muted-foreground hover:bg-muted">
               <BarChart3 className="h-6 w-6" />
@@ -67,7 +91,7 @@ export function Navbar() {
           {navigation.map((item) => {
             const Icon = item.icon;
             const isActive = location.pathname === item.href;
-            
+
             return (
               <Link
                 key={item.name}
@@ -84,6 +108,15 @@ export function Navbar() {
               </Link>
             );
           })}
+
+          {/* 🔥 Logout button (mobile) */}
+          <button
+            onClick={handleLogout}
+            className="flex flex-col items-center gap-1 rounded-lg p-2 text-xs text-red-500 hover:bg-red-100 transition-base"
+          >
+            <LogOut className="h-5 w-5" />
+            <span className="truncate">Salir</span>
+          </button>
         </div>
       </div>
     </nav>
